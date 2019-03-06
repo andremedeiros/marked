@@ -12,7 +12,7 @@ srcfiles=$(wildcard src/*.c)
 
 all: marked
 
-%.c: %.rl
+%.c: %.c.rl
 	ragel -o $@ $<
 
 marked: builddir src/parser.c

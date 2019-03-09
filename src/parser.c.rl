@@ -1,19 +1,28 @@
-#include <stdio.h>
-#include <string.h>
-
 #include "parser.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-const-variable"
 %%{
   machine marked;
   write data;
+}%%
+#pragma GCC diagnostic pop
 
+%%{
+  action mark { mark = (p - parser->buffer); }
 
-  action mark { mark = (p - buffer); }
-
-  action atx_header_end     { node->child = header; }
-  action atx_header_start   { header->offset = mark; }
-  action atx_header_content { header->length = (mark - header->offset); }
+  action atx_header_end     { node->child = marked_parser_stack_pop(parser); }
+  action atx_header_start   {
+    marked_node *header = marked_node_new(parser->buffer);
+    header->offset = mark;
+    marked_parser_stack_push(parser, header);
+  }
+  action atx_header_content {
+    marked_node *header = marked_parser_stack_current(parser);
+    header->length = (mark - header->offset);
+  }
   action atx_header_prefix  {
+    marked_node *header = marked_parser_stack_current(parser);
     switch(mark - header->offset) {
       case 1: header->type = HEADER1; break;
       case 2: header->type = HEADER2; break;
@@ -38,14 +47,30 @@
   Document := AtxHeader | SetexHeader | any;
 }%%
 
-marked_node *marked_parse(char *buffer) {
-  marked_node *header = marked_node_new(buffer);
+marked_parser *marked_parser_new(char *buffer) {
+  marked_parser *parser = malloc(sizeof(marked_parser));
 
+  parser->buffer = buffer;
+  parser->length = strlen(buffer);
+  parser->stack = NULL;
+
+  return parser;
+}
+
+void marked_parser_free(marked_parser *parser) {
+  for(marked_parser_stack_element *el = parser->stack; el != NULL; el = el->next) {
+    free(el);
+  }
+
+  free(parser);
+}
+
+marked_node *marked_parser_parse(marked_parser *parser) {
   int cs, res __attribute__((unused))= 0;
   int mark = 0;
-  char *p = buffer;
-  char *eof;
-  char *pe = p + strlen(buffer) + 1;
+  char *p = parser->buffer;
+  char *eof __attribute__((unused));
+  char *pe = p + parser->length + 1;
 
   marked_node *node = marked_node_new(p);
   node->type = DOCUMENT;
@@ -55,4 +80,35 @@ marked_node *marked_parse(char *buffer) {
   %%write exec;
 
   return node;
+}
+
+void marked_parser_stack_push(marked_parser *parser, marked_node *node) {
+  marked_parser_stack_element *stack = malloc(sizeof(marked_parser_stack_element));
+
+  stack->node = node;
+  stack->previous = NULL;
+  stack->next = NULL;
+
+  if(parser->stack != NULL) {
+    parser->stack->next = stack;
+    stack->previous = parser->stack;
+  }
+  parser->stack = stack;
+}
+
+marked_node *marked_parser_stack_pop(marked_parser *parser) {
+  assert(parser->stack);
+
+  marked_parser_stack_element *stack = parser->stack;
+  parser->stack = stack->previous;
+
+  marked_node *node = stack->node;
+  free(stack);
+
+  return node;
+}
+
+marked_node *marked_parser_stack_current(marked_parser *parser) {
+  assert(parser->stack);
+  return parser->stack->node;
 }

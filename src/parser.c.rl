@@ -11,7 +11,11 @@
 %%{
   action mark { mark = (p - parser->buffer); }
 
-  action atx_header_end     { node->child = marked_parser_stack_pop(parser); }
+  action atx_header_end     {
+    marked_node *header = marked_parser_stack_pop(parser);
+    // TODO
+    marked_parser_stack_current(parser)->child = header;
+  }
   action atx_header_start   {
     marked_node *header = marked_node_new(parser->buffer);
     header->offset = mark;
@@ -58,28 +62,29 @@ marked_parser *marked_parser_new(char *buffer) {
 }
 
 void marked_parser_free(marked_parser *parser) {
-  for(marked_parser_stack_element *el = parser->stack; el != NULL; el = el->next) {
-    free(el);
-  }
-
+  assert(!parser->stack);
   free(parser);
 }
 
 marked_node *marked_parser_parse(marked_parser *parser) {
-  int cs, res __attribute__((unused))= 0;
+  int cs, res __attribute__((unused)) = 0;
   int mark = 0;
   char *p = parser->buffer;
   char *eof __attribute__((unused));
   char *pe = p + parser->length + 1;
 
   marked_node *node = marked_node_new(p);
+  marked_parser_stack_push(parser, node);
   node->type = DOCUMENT;
-  node->length = (pe - p);
+  node->length = parser->length;
 
   %%write init;
   %%write exec;
 
-  return node;
+  marked_node *document = marked_parser_stack_pop(parser);
+  marked_parser_free(parser);
+
+  return document;
 }
 
 void marked_parser_stack_push(marked_parser *parser, marked_node *node) {
@@ -101,6 +106,10 @@ marked_node *marked_parser_stack_pop(marked_parser *parser) {
 
   marked_parser_stack_element *stack = parser->stack;
   parser->stack = stack->previous;
+
+  if(parser->stack) {
+    parser->stack->next = NULL;
+  }
 
   marked_node *node = stack->node;
   free(stack);

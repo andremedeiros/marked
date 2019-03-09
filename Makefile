@@ -12,6 +12,9 @@ srcfiles=$(wildcard src/*.c)
 
 all: marked
 
+debug: CFLAGS += -DDEBUG -g
+debug: marked
+
 %.c: %.c.rl
 	ragel -o $@ $<
 

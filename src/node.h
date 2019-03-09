@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdlib.h>
 #include <string.h>
 
 enum marked_node_type {

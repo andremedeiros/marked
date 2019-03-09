@@ -1,5 +1,3 @@
-#include <stdlib.h>
-
 #include "node.h"
 
 marked_node *marked_node_new(char *content) {
@@ -18,7 +16,7 @@ marked_node *marked_node_new(char *content) {
 }
 
 char *marked_node_content(marked_node *node) {
-  char *content = malloc(sizeof(char *) * node->length + 1);
+  char *content = malloc(sizeof(char) * node->length + 1);
   memcpy(content, node->content, node->length);
   content[node->length + 1] = '\0';
 
@@ -28,5 +26,3 @@ char *marked_node_content(marked_node *node) {
 void marked_node_free(marked_node *node) {
   free(node);
 }
-
-
